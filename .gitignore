@@ -1,3 +1,5 @@
 /Offline_Sessions/
 ~$*
 *.tmp
+__pycache__/
+*.pyc
