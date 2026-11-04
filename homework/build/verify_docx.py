@@ -56,9 +56,16 @@ def main():
         "margins": 'w:right="1701"' in doc and 'w:left="1134"' in doc,
         "footnotes part": "word/footnotes.xml" in z.namelist(),
         "footnote ref in body": "footnoteReference" in doc,
-        "footnote text present": "الحواجز" not in parts.get("word/footnotes.xml", b"").decode("utf-8") or True,
+        "footnote text present": "كذا في الأصل" in parts.get("word/footnotes.xml", b"").decode("utf-8") and "البيروقراطية" in parts.get("word/footnotes.xml", b"").decode("utf-8"),
         "header rule": "0F62FE" in parts["word/header1.xml"].decode("utf-8"),
         "cover rule 8cm": 'w:right="2268"' in doc,
+        "no nested paragraphs": all(not any(c.tag == W + "p" for c in p) for p in etree.fromstring(parts["word/document.xml"]).iter(W + "p")),
+        "all shading has required val": all(W + "val" in shd.attrib for data in parts.values() for shd in etree.fromstring(data).iter(W + "shd")),
+        "header paragraph properties ordered": all(
+            [c.tag.split("}")[-1] for c in pp] == sorted(
+                [c.tag.split("}")[-1] for c in pp],
+                key=lambda tag: BD.ORDER["pPr"].index(tag) if tag in BD.ORDER["pPr"] else 999)
+            for pp in etree.fromstring(parts["word/header1.xml"]).iter(W + "pPr")),
     }
     for k, v in checks.items():
         check(k, v)

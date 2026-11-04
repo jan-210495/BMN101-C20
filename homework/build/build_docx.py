@@ -341,6 +341,34 @@ def normalize_tree(root):
     return fixed
 
 
+def normalize_package(pkg):
+    """Normalize every WordprocessingML part, not just document.xml.
+
+    Word requires an explicit shading pattern value, and paragraph properties
+    in headers/footers must follow the same schema ordering as body paragraphs.
+    """
+    fixed = normalize_tree(pkg.doc)
+    for shd in pkg.doc.iter(W + "shd"):
+        if W + "val" not in shd.attrib:
+            shd.set(W + "val", "clear")
+            fixed += 1
+    for name, data in list(pkg.parts.items()):
+        if not (name.startswith("word/") and name.endswith(".xml")) or name == "word/document.xml":
+            continue
+        try:
+            root = etree.fromstring(data)
+        except etree.XMLSyntaxError:
+            continue
+        fixed += normalize_tree(root)
+        for shd in root.iter(W + "shd"):
+            if W + "val" not in shd.attrib:
+                shd.set(W + "val", "clear")
+                fixed += 1
+        pkg.parts[name] = etree.tostring(root, xml_declaration=True,
+                                         encoding="UTF-8", standalone=True)
+    return fixed
+
+
 # ------------------------------------------------------------ Q3 source text
 TIER1 = [
     ("ان", "أن", "word", "همزة"),
@@ -874,10 +902,10 @@ def main():
     # departments
     dcells = []
     for name, desc in depts:
-        inner = (para_xml(run(name, bold=True, color=NAVY, size=26), jc="center", after=40, line=280)
-                 + para_xml(run(desc, size=24, color=GRAY), jc="center", after=0, line=260))
+        inner = [para_xml(run(name, bold=True, color=NAVY, size=26), jc="center", after=40, line=280),
+                 para_xml(run(desc, size=24, color=GRAY), jc="center", after=0, line=260)]
         dcells.append(cell("", 1512, span=3, fill=LIGHT, borders=borders_all(BLUE, 8),
-                           runs=inner, mar=(60, 60, 60, 60), valign="top"))
+                           paras=inner, mar=(60, 60, 60, 60), valign="top"))
     rows.append(tr(dcells, height=900))
     # dashed separator
     rows.append(tr([cell("", 9071, span=18, size=4, mar=(0, 0, 0, 0),
@@ -1046,8 +1074,8 @@ def main():
             log("Q1 duplicate item number fixed: 6. خاتمة -> 7. خاتمة")
 
     # ============================ normalize child order + save
-    fixed = normalize_tree(pkg.doc)
-    log("schema-order fixes: %d elements" % fixed)
+    fixed = normalize_package(pkg)
+    log("schema-order and shading fixes: %d elements" % fixed)
     pkg.save()
     log("saved: %s" % DOCX)
 
